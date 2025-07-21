@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'providers/expense_provider.dart';
 import 'screens/home_screen.dart';
 import 'screens/add_expense_screen.dart';
+import 'screens/onboarding_screen.dart';
 
 void main() {
   runApp(const PocketPalApp());
@@ -31,8 +32,9 @@ class PocketPalApp extends StatelessWidget {
               scaffoldBackgroundColor: Colors.black,
               colorSchemeSeed: Colors.indigo,
             ),
-            initialRoute: '/',
+            initialRoute: '/onboarding',
             routes: {
+              '/onboarding': (context) => const OnboardingScreen(),
               '/': (context) => const HomeScreen(),
               '/add-expense': (context) => const AddExpenseScreen(),
             },
