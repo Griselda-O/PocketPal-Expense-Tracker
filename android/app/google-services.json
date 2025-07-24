@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "699815209313",
+    "project_id": "pocketpal-1dbf4",
+    "storage_bucket": "pocketpal-1dbf4.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:699815209313:android:04ff9e0578c02b98637d20",
+        "android_client_info": {
+          "package_name": "com.example.pocketpal"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBeORbClez20ugFCOI5d3OzWXmZthafB8w"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

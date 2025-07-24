@@ -2,13 +2,47 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/expense_provider.dart';
 import 'package:fl_chart/fl_chart.dart';
-import 'dart:math';
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'package:csv/csv.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:pdf/pdf.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'profile_screen.dart';
+import 'budget_screen.dart';
+import 'reports_screen.dart';
+import 'expenses_screen.dart';
+
+class BudgetPlaceholderScreen extends StatelessWidget {
+  const BudgetPlaceholderScreen({super.key});
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Center(
+        child: Text(
+          'Budget Management (Coming Soon)',
+          style: TextStyle(fontSize: 20),
+        ),
+      ),
+    );
+  }
+}
+
+class ReportsPlaceholderScreen extends StatelessWidget {
+  const ReportsPlaceholderScreen({super.key});
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Center(
+        child: Text(
+          'Reports & Analysis (Coming Soon)',
+          style: TextStyle(fontSize: 20),
+        ),
+      ),
+    );
+  }
+}
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -19,402 +53,477 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen>
     with SingleTickerProviderStateMixin {
-  int _selectedTab = 0; // 0: Week, 1: Month, 2: Year
+  int _selectedTab =
+      0; // 0: Home, 1: Profile, 2: Budget, 3: Reports, 4: Expenses
+  int _selectedChartPeriod = 0; // 0: Week, 1: Month, 2: Year
+  String _userName = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserName();
+  }
+
+  Future<void> _loadUserName() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _userName = prefs.getString('name') ?? '';
+    });
+  }
+
+  Future<void> _logout() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('loggedIn', false);
+    await prefs.remove('email');
+    await prefs.remove('name');
+    await prefs.remove('phone');
+    if (mounted) {
+      Navigator.pushReplacementNamed(context, '/login');
+    }
+  }
+
+  Widget _getTabPage() {
+    switch (_selectedTab) {
+      case 0:
+        return _buildHomeDashboard();
+      case 1:
+        return const ProfileScreen();
+      case 2:
+        return const BudgetScreen();
+      case 3:
+        return const ReportsScreen();
+      case 4:
+        return const ExpensesScreen();
+      default:
+        return _buildHomeDashboard();
+    }
+  }
+
+  Widget _buildHomeDashboard() {
+    final provider = Provider.of<ExpenseProvider>(context);
+    final double diff = provider.totalMonthlyExpenses - provider.monthlyBudget;
+    Widget budgetStatus;
+    if (diff > 0) {
+      budgetStatus = Text(
+        'You are over budget by GHS ${diff.toStringAsFixed(2)}',
+        style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
+      );
+    } else {
+      budgetStatus = Text(
+        'You are under budget by GHS ${diff.abs().toStringAsFixed(2)}',
+        style: const TextStyle(
+          color: Colors.green,
+          fontWeight: FontWeight.bold,
+        ),
+      );
+    }
+    double progress = provider.budgetProgress;
+    Color progressColor;
+    if (progress < 0.8) {
+      progressColor = Colors.green;
+    } else if (progress < 1.0) {
+      progressColor = Colors.orange;
+    } else {
+      progressColor = Colors.red;
+    }
+    return SafeArea(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          return SingleChildScrollView(
+            padding: const EdgeInsets.all(16.0),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 500),
+                child: provider.expenses.isEmpty
+                    ? Padding(
+                        padding: const EdgeInsets.only(top: 80.0),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.start,
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.wallet,
+                              size: 80,
+                              color: Colors.indigo.withOpacity(0.3),
+                            ),
+                            const SizedBox(height: 24),
+                            Text(
+                              "No expenses yet!",
+                              style: Theme.of(context).textTheme.titleLarge,
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              "Start tracking your spending by adding your first expense.",
+                              style: Theme.of(context).textTheme.bodyMedium,
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 32),
+                            ElevatedButton.icon(
+                              onPressed: () {
+                                Navigator.pushNamed(context, '/add-expense');
+                              },
+                              icon: const Icon(Icons.add),
+                              label: const Text("Add Expense"),
+                            ),
+                          ],
+                        ),
+                      )
+                    : Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Budget Progress Bar Section
+                          Card(
+                            margin: const EdgeInsets.only(bottom: 16),
+                            elevation: 2,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.all(16.0),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          "Monthly Budget: GHS ${provider.monthlyBudget.toStringAsFixed(2)}",
+                                          style: Theme.of(
+                                            context,
+                                          ).textTheme.bodyMedium,
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            LinearProgressIndicator(
+                                              value: progress > 1.0
+                                                  ? 1.0
+                                                  : progress,
+                                              minHeight: 10,
+                                              backgroundColor: Colors.grey[300],
+                                              valueColor:
+                                                  AlwaysStoppedAnimation<Color>(
+                                                    progressColor,
+                                                  ),
+                                            ),
+                                            if (progress >= 1.0)
+                                              Padding(
+                                                padding: const EdgeInsets.only(
+                                                  top: 4.0,
+                                                ),
+                                                child: Text(
+                                                  "Over Budget!",
+                                                  style: TextStyle(
+                                                    color: Colors.red,
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                                ),
+                                              ),
+                                            budgetStatus,
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(Icons.edit),
+                                    tooltip: 'Edit Budget',
+                                    onPressed: () async {
+                                      final controller = TextEditingController(
+                                        text: provider.monthlyBudget
+                                            .toStringAsFixed(2),
+                                      );
+                                      final result = await showDialog<double>(
+                                        context: context,
+                                        builder: (context) => AlertDialog(
+                                          title: const Text(
+                                            'Set Monthly Budget',
+                                          ),
+                                          content: TextField(
+                                            controller: controller,
+                                            keyboardType:
+                                                TextInputType.numberWithOptions(
+                                                  decimal: true,
+                                                ),
+                                            decoration: const InputDecoration(
+                                              labelText: 'Budget (GHS)',
+                                            ),
+                                          ),
+                                          actions: [
+                                            TextButton(
+                                              onPressed: () =>
+                                                  Navigator.pop(context),
+                                              child: const Text('Cancel'),
+                                            ),
+                                            ElevatedButton(
+                                              onPressed: () {
+                                                final value = double.tryParse(
+                                                  controller.text,
+                                                );
+                                                if (value != null &&
+                                                    value > 0) {
+                                                  Navigator.pop(context, value);
+                                                }
+                                              },
+                                              child: const Text('Save'),
+                                            ),
+                                          ],
+                                        ),
+                                      );
+                                      if (result != null) {
+                                        provider.monthlyBudget = result;
+                                      }
+                                    },
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 16.0),
+                            child: Center(
+                              child: ElevatedButton.icon(
+                                icon: const Icon(Icons.account_balance_wallet),
+                                label: const Text('Open Budget Page'),
+                                onPressed: () {
+                                  Navigator.pushNamed(context, '/budget');
+                                },
+                              ),
+                            ),
+                          ),
+                          // Export Buttons Section
+                          Card(
+                            margin: const EdgeInsets.only(bottom: 16),
+                            elevation: 2,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.all(16.0),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.end,
+                                children: [
+                                  ElevatedButton.icon(
+                                    onPressed: () =>
+                                        _exportCSV(context, provider),
+                                    icon: const Icon(Icons.download),
+                                    label: const Text('Export CSV'),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  ElevatedButton.icon(
+                                    onPressed: () =>
+                                        _exportPDF(context, provider),
+                                    icon: const Icon(Icons.picture_as_pdf),
+                                    label: const Text('Export PDF'),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          // Chart & Analytics Section
+                          Card(
+                            margin: const EdgeInsets.only(bottom: 16),
+                            elevation: 2,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.all(16.0),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Center(
+                                    child: ToggleButtons(
+                                      borderRadius: BorderRadius.circular(24),
+                                      isSelected: [0, 1, 2]
+                                          .map((i) => _selectedChartPeriod == i)
+                                          .toList(),
+                                      onPressed: (index) {
+                                        setState(() {
+                                          _selectedChartPeriod = index;
+                                        });
+                                      },
+                                      selectedColor: Colors.white,
+                                      fillColor: Colors.indigo,
+                                      color: Colors.indigo,
+                                      constraints: const BoxConstraints(
+                                        minWidth: 80,
+                                        minHeight: 36,
+                                      ),
+                                      children: const [
+                                        Text('Week'),
+                                        Text('Month'),
+                                        Text('Year'),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(height: 16),
+                                  Text(
+                                    _selectedChartPeriod == 0
+                                        ? "This Week's Expenses"
+                                        : _selectedChartPeriod == 1
+                                        ? "This Month's Expenses"
+                                        : "This Year's Expenses",
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.titleMedium,
+                                  ),
+                                  SizedBox(
+                                    height: 260,
+                                    child: _buildDotChart(
+                                      context,
+                                      provider,
+                                      _selectedChartPeriod,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 16),
+                                  _buildAnalytics(
+                                    provider,
+                                    _selectedChartPeriod,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          // Expenses List Section
+                          Card(
+                            margin: const EdgeInsets.only(bottom: 16),
+                            elevation: 2,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.all(16.0),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    "Expenses:",
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.titleLarge,
+                                  ),
+                                  const SizedBox(height: 16),
+                                  ...provider.expenses.map(
+                                    (e) => Card(
+                                      margin: const EdgeInsets.only(bottom: 8),
+                                      child: ListTile(
+                                        title: Text(e.category),
+                                        subtitle: Text(e.note),
+                                        trailing: Text(
+                                          'GHS ${e.amount.toStringAsFixed(2)}',
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  Center(
+                                    child: ElevatedButton.icon(
+                                      onPressed: () {
+                                        Navigator.pushNamed(
+                                          context,
+                                          '/add-expense',
+                                        );
+                                      },
+                                      icon: const Icon(Icons.add),
+                                      label: const Text("Add Expense"),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final provider = Provider.of<ExpenseProvider>(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final predictedCardColor = isDark
-        ? Colors.grey[900]
-        : Colors.indigo.shade50;
-    final predictedTextColor = isDark ? Colors.white : Colors.black87;
 
     return Scaffold(
       appBar: AppBar(
         title: const Text("PocketPal Home"),
         actions: [
+          if (_userName.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8.0),
+              child: Center(
+                child: Text(
+                  'Hi, $_userName!',
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ),
+            ),
+          IconButton(
+            icon: const Icon(Icons.settings),
+            tooltip: 'Settings',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const SettingsScreen()),
+              );
+            },
+          ),
           IconButton(
             icon: Icon(
               provider.isDarkMode ? Icons.light_mode : Icons.dark_mode,
             ),
             onPressed: () => provider.toggleTheme(),
           ),
+          IconButton(
+            icon: const Icon(Icons.logout),
+            tooltip: 'Logout',
+            onPressed: _logout,
+          ),
         ],
       ),
-      body: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            return SingleChildScrollView(
-              padding: const EdgeInsets.all(16.0),
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 500),
-                  child: provider.expenses.isEmpty
-                      ? Padding(
-                          padding: const EdgeInsets.only(top: 80.0),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.start,
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.wallet,
-                                size: 80,
-                                color: Colors.indigo.withOpacity(0.3),
-                              ),
-                              const SizedBox(height: 24),
-                              Text(
-                                "No expenses yet!",
-                                style: Theme.of(context).textTheme.titleLarge,
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                "Start tracking your spending by adding your first expense.",
-                                style: Theme.of(context).textTheme.bodyMedium,
-                                textAlign: TextAlign.center,
-                              ),
-                              const SizedBox(height: 32),
-                              ElevatedButton.icon(
-                                onPressed: () {
-                                  Navigator.pushNamed(context, '/add-expense');
-                                },
-                                icon: const Icon(Icons.add),
-                                label: const Text("Add Expense"),
-                              ),
-                            ],
-                          ),
-                        )
-                      : Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // Budget Progress Bar and Edit Button with color feedback
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        "Monthly Budget: GHS ${provider.monthlyBudget.toStringAsFixed(2)}",
-                                        style: Theme.of(
-                                          context,
-                                        ).textTheme.bodyMedium,
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Builder(
-                                        builder: (context) {
-                                          double progress =
-                                              provider.budgetProgress;
-                                          Color progressColor;
-                                          if (progress < 0.8) {
-                                            progressColor = Colors.green;
-                                          } else if (progress < 1.0) {
-                                            progressColor = Colors.orange;
-                                          } else {
-                                            progressColor = Colors.red;
-                                          }
-                                          return Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                              LinearProgressIndicator(
-                                                value: progress > 1.0
-                                                    ? 1.0
-                                                    : progress,
-                                                minHeight: 10,
-                                                backgroundColor:
-                                                    Colors.grey[300],
-                                                valueColor:
-                                                    AlwaysStoppedAnimation<
-                                                      Color
-                                                    >(progressColor),
-                                              ),
-                                              if (progress >= 1.0)
-                                                Padding(
-                                                  padding:
-                                                      const EdgeInsets.only(
-                                                        top: 4.0,
-                                                      ),
-                                                  child: Text(
-                                                    "Over Budget!",
-                                                    style: TextStyle(
-                                                      color: Colors.red,
-                                                      fontWeight:
-                                                          FontWeight.bold,
-                                                    ),
-                                                  ),
-                                                ),
-                                            ],
-                                          );
-                                        },
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                IconButton(
-                                  icon: const Icon(Icons.edit),
-                                  tooltip: 'Edit Budget',
-                                  onPressed: () async {
-                                    final controller = TextEditingController(
-                                      text: provider.monthlyBudget
-                                          .toStringAsFixed(2),
-                                    );
-                                    final result = await showDialog<double>(
-                                      context: context,
-                                      builder: (context) => AlertDialog(
-                                        title: const Text('Set Monthly Budget'),
-                                        content: TextField(
-                                          controller: controller,
-                                          keyboardType:
-                                              TextInputType.numberWithOptions(
-                                                decimal: true,
-                                              ),
-                                          decoration: const InputDecoration(
-                                            labelText: 'Budget (GHS)',
-                                          ),
-                                        ),
-                                        actions: [
-                                          TextButton(
-                                            onPressed: () =>
-                                                Navigator.pop(context),
-                                            child: const Text('Cancel'),
-                                          ),
-                                          ElevatedButton(
-                                            onPressed: () {
-                                              final value = double.tryParse(
-                                                controller.text,
-                                              );
-                                              if (value != null && value > 0) {
-                                                Navigator.pop(context, value);
-                                              }
-                                            },
-                                            child: const Text('Save'),
-                                          ),
-                                        ],
-                                      ),
-                                    );
-                                    if (result != null) {
-                                      provider.monthlyBudget = result;
-                                    }
-                                  },
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 24),
-                            // Export buttons
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.end,
-                              children: [
-                                ElevatedButton.icon(
-                                  onPressed: () =>
-                                      _exportCSV(context, provider),
-                                  icon: const Icon(Icons.download),
-                                  label: const Text('Export CSV'),
-                                ),
-                                const SizedBox(width: 8),
-                                ElevatedButton.icon(
-                                  onPressed: () =>
-                                      _exportPDF(context, provider),
-                                  icon: const Icon(Icons.picture_as_pdf),
-                                  label: const Text('Export PDF'),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 24),
-                            // Chart period toggle
-                            Center(
-                              child: ToggleButtons(
-                                borderRadius: BorderRadius.circular(24),
-                                isSelected: [
-                                  0,
-                                  1,
-                                  2,
-                                ].map((i) => _selectedTab == i).toList(),
-                                onPressed: (index) {
-                                  setState(() {
-                                    _selectedTab = index;
-                                  });
-                                },
-                                selectedColor: Colors.white,
-                                fillColor: Colors.indigo,
-                                color: Colors.indigo,
-                                constraints: const BoxConstraints(
-                                  minWidth: 80,
-                                  minHeight: 36,
-                                ),
-                                children: const [
-                                  Text('Week'),
-                                  Text('Month'),
-                                  Text('Year'),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              _selectedTab == 0
-                                  ? "This Week's Expenses"
-                                  : _selectedTab == 1
-                                  ? "This Month's Expenses"
-                                  : "This Year's Expenses",
-                              style: Theme.of(context).textTheme.titleMedium,
-                            ),
-                            SizedBox(
-                              height: 260,
-                              child: _buildDotChart(
-                                context,
-                                provider,
-                                _selectedTab,
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-                            _buildAnalytics(provider, _selectedTab),
-                            const SizedBox(height: 24),
-                            Text(
-                              "Expenses:",
-                              style: Theme.of(context).textTheme.titleLarge,
-                            ),
-                            const SizedBox(height: 16),
-                            ...provider.expenses.map(
-                              (e) => Card(
-                                child: ListTile(
-                                  title: Text(e.category),
-                                  subtitle: Text(e.note),
-                                  trailing: Text(
-                                    'GHS ${e.amount.toStringAsFixed(2)}',
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 32),
-                            Center(
-                              child: ElevatedButton.icon(
-                                onPressed: () {
-                                  Navigator.pushNamed(context, '/add-expense');
-                                },
-                                icon: const Icon(Icons.add),
-                                label: const Text("Add Expense"),
-                              ),
-                            ),
-                          ],
-                        ),
-                ),
-              ),
-            );
-          },
-        ),
+      body: _getTabPage(),
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _selectedTab,
+        onTap: (index) => setState(() => _selectedTab = index),
+        type: BottomNavigationBarType.fixed,
+        items: const [
+          BottomNavigationBarItem(icon: Icon(Icons.dashboard), label: 'Home'),
+          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.account_balance_wallet),
+            label: 'Budget',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.bar_chart),
+            label: 'Reports',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.receipt_long),
+            label: 'Expenses',
+          ),
+        ],
       ),
     );
   }
 }
 
-Widget _buildBarChart(
-  BuildContext context,
-  ExpenseProvider provider,
-  int period,
-) {
-  // period: 0 = week, 1 = month, 2 = year
-  Map<String, double> data;
-  if (period == 0) {
-    data = provider.dailyExpensesThisWeek;
-  } else if (period == 1) {
-    data = _monthlyExpenses(provider);
-  } else {
-    data = _yearlyExpenses(provider);
-  }
-  final keys = data.keys.toList().reversed.toList();
-  final values = data.values.toList().reversed.toList();
-
-  // Limit number of bars for month/year to avoid overflow
-  List<String> limitedKeys = keys;
-  List<double> limitedValues = values;
-  if (period != 0 && keys.length > 14) {
-    limitedKeys = keys.sublist(keys.length - 14);
-    limitedValues = values.sublist(values.length - 14);
-  }
-
-  final theme = Theme.of(context);
-  final barColor = theme.colorScheme.primary;
-  final tooltipBg = theme.colorScheme.primary.withOpacity(0.8);
-  final textColor = theme.colorScheme.onPrimary;
-
-  // Show fewer x-axis labels for month/year, and rotate them
-  int labelStep = 1;
-  double labelAngle = 0;
-  if (period == 1) {
-    labelStep = 3;
-    labelAngle = -0.7;
-  } else if (period == 2) {
-    labelStep = 1;
-    labelAngle = -0.7;
-  }
-
-  if (limitedKeys.isEmpty || limitedValues.isEmpty) {
-    return const SizedBox(height: 200);
-  }
-
-  return BarChart(
-    BarChartData(
-      alignment: BarChartAlignment.spaceAround,
-      barTouchData: BarTouchData(
-        enabled: true,
-        touchTooltipData: BarTouchTooltipData(
-          tooltipBgColor: tooltipBg,
-          getTooltipItem: (group, groupIndex, rod, rodIndex) {
-            return BarTooltipItem(
-              '${limitedKeys[group.x]}\nGHS ${rod.toY.toStringAsFixed(2)}',
-              TextStyle(color: textColor, fontWeight: FontWeight.bold),
-            );
-          },
-        ),
+class SettingsScreen extends StatelessWidget {
+  const SettingsScreen({super.key});
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Settings')),
+      body: const Center(
+        child: Text('Settings (Coming Soon)', style: TextStyle(fontSize: 20)),
       ),
-      titlesData: FlTitlesData(
-        bottomTitles: AxisTitles(
-          sideTitles: SideTitles(
-            showTitles: true,
-            getTitlesWidget: (value, _) {
-              final index = value.toInt();
-              if (index < 0 || index >= limitedKeys.length)
-                return const Text('');
-              // Show all labels for week, every 3rd for month, every 1 for year
-              if (period == 0 || index % (period == 1 ? 3 : 1) == 0) {
-                return Transform.rotate(
-                  angle: period == 0 ? 0 : -0.7,
-                  child: Text(
-                    limitedKeys[index],
-                    style: const TextStyle(fontSize: 10),
-                  ),
-                );
-              }
-              return const Text('');
-            },
-          ),
-        ),
-        leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: true)),
-      ),
-      borderData: FlBorderData(show: false),
-      barGroups: List.generate(
-        limitedValues.length,
-        (i) => BarChartGroupData(
-          x: i,
-          barRods: [
-            BarChartRodData(
-              toY: limitedValues[i],
-              width: 16,
-              color: barColor,
-              borderRadius: BorderRadius.circular(4),
-            ),
-          ],
-        ),
-      ),
-      gridData: FlGridData(show: true),
-      maxY: limitedValues.isNotEmpty
-          ? (limitedValues.reduce((a, b) => a > b ? a : b) * 1.2)
-          : 10,
-    ),
-    swapAnimationDuration: const Duration(milliseconds: 600),
-    swapAnimationCurve: Curves.easeInOut,
-  );
+    );
+  }
 }
 
 Map<String, double> _monthlyExpenses(ExpenseProvider provider) {

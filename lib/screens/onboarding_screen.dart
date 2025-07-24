@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
@@ -11,8 +13,34 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   int _page = 0;
   final PageController _controller = PageController();
   String _budget = '';
-  String _category = '';
+  List<String> _selectedCategories = [];
   String _goal = '';
+
+  final List<String> _categories = [
+    'Food',
+    'Transport',
+    'Health',
+    'Entertainment',
+    'Utilities',
+    'Shopping',
+    'Education',
+    'Savings',
+    'Travel',
+    'Airtime',
+    'Printing',
+    'Leisure',
+    'Other',
+  ];
+  final List<String> _goals = [
+    'Save more',
+    'Reduce debt',
+    'Track spending',
+    'Build emergency fund',
+    'Invest',
+    'Budget for travel',
+    'Increase income',
+    'Other',
+  ];
 
   void _nextPage() {
     if (_page < 3) {
@@ -47,7 +75,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 const Spacer(),
-                Image.asset('assets/onboarding/welcome.svg', height: 180),
+                SvgPicture.asset('assets/onboarding/welcome.svg', height: 180),
                 const SizedBox(height: 32),
                 Text(
                   'Welcome to PocketPal!',
@@ -110,7 +138,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     const SizedBox(height: 16),
-                    Image.asset('assets/onboarding/questions.svg', height: 140),
+                    SvgPicture.asset(
+                      'assets/onboarding/questions.svg',
+                      height: 140,
+                    ),
                     const SizedBox(height: 16),
                     Text(
                       'Let’s personalize your experience!',
@@ -125,22 +156,70 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       onChanged: (v) => _budget = v,
                     ),
                     const SizedBox(height: 16),
-                    TextField(
-                      decoration: const InputDecoration(
-                        labelText: 'Top spending category?',
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        'Top spending categories:',
+                        style: Theme.of(context).textTheme.bodyMedium,
                       ),
-                      onChanged: (v) => _category = v,
+                    ),
+                    Wrap(
+                      spacing: 8,
+                      children: _categories
+                          .map(
+                            (cat) => FilterChip(
+                              label: Text(cat),
+                              selected: _selectedCategories.contains(cat),
+                              onSelected: (selected) {
+                                setState(() {
+                                  if (selected) {
+                                    _selectedCategories.add(cat);
+                                  } else {
+                                    _selectedCategories.remove(cat);
+                                  }
+                                });
+                              },
+                            ),
+                          )
+                          .toList(),
                     ),
                     const SizedBox(height: 16),
-                    TextField(
-                      decoration: const InputDecoration(
-                        labelText: 'Main financial goal?',
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        'Main financial goal:',
+                        style: Theme.of(context).textTheme.bodyMedium,
                       ),
-                      onChanged: (v) => _goal = v,
+                    ),
+                    Column(
+                      children: _goals
+                          .map(
+                            (goal) => RadioListTile<String>(
+                              title: Text(goal),
+                              value: goal,
+                              groupValue: _goal,
+                              onChanged: (value) {
+                                setState(() {
+                                  _goal = value!;
+                                });
+                              },
+                            ),
+                          )
+                          .toList(),
                     ),
                     const SizedBox(height: 32),
                     ElevatedButton(
-                      onPressed: _nextPage,
+                      onPressed: () async {
+                        // Persist onboarding choices
+                        final prefs = await SharedPreferences.getInstance();
+                        await prefs.setString('budget', _budget);
+                        await prefs.setStringList(
+                          'categories',
+                          _selectedCategories,
+                        );
+                        await prefs.setString('goal', _goal);
+                        _nextPage();
+                      },
                       child: const Text('Continue'),
                     ),
                     TextButton(onPressed: _prevPage, child: const Text('Back')),
@@ -153,7 +232,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 const Spacer(),
-                Image.asset('assets/onboarding/success.svg', height: 180),
+                SvgPicture.asset('assets/onboarding/success.svg', height: 180),
                 const SizedBox(height: 32),
                 Text(
                   'All set!',
@@ -169,7 +248,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 ),
                 const Spacer(),
                 ElevatedButton(
-                  onPressed: () {
+                  onPressed: () async {
+                    final prefs = await SharedPreferences.getInstance();
+                    await prefs.setBool('onboardingComplete', true);
                     Navigator.pushReplacementNamed(
                       context,
                       '/login',
@@ -202,14 +283,19 @@ class _FeatureCard extends StatelessWidget {
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Padding(
-        padding: const EdgeInsets.all(24.0),
+        padding: const EdgeInsets.all(16.0),
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Image.asset(image, height: 80),
-            const SizedBox(height: 16),
-            Text(title, style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 8),
+            SvgPicture.asset(image, height: 60),
+            const SizedBox(height: 12),
+            Text(
+              title,
+              style: Theme.of(context).textTheme.titleMedium,
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 6),
             Text(desc, textAlign: TextAlign.center),
           ],
         ),

@@ -32,27 +32,38 @@ dependencies:
     sdk: flutter
   provider: ^6.0.5
   uuid: ^4.3.3
-  fl_chart: ^0.64.0
-  csv: ^5.0.2
+  fl_chart: ^1.0.0
+  csv: ^6.0.0
   pdf: ^3.10.4
   path_provider: ^2.1.2
-  share_plus: ^7.2.1
+  share_plus: ^11.0.0
   flutter_svg: ^2.0.10
+  shared_preferences: ^2.2.2
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
+  firebase_core: any
+  firebase_auth: any
+  image_picker: ^1.0.7
+  cloud_firestore: any
+  firebase_storage: any
+  firebase_messaging: any
+  firebase_analytics: any
+  http: any
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
+  pigeon: ^14.0.0  
+
 
   # The "flutter_lints" package below contains a set of recommended lints to
   # encourage good coding practices. The lint set provided by the package is
   # activated in the `analysis_options.yaml` file located at the root of your
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
-  flutter_lints: ^5.0.0
+  flutter_lints: ^6.0.0
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
